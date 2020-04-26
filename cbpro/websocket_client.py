@@ -13,7 +13,7 @@ import hashlib
 import time
 from threading import Thread
 from websocket import create_connection, WebSocketConnectionClosedException
-from pymongo import MongoClient
+#from pymongo import MongoClient
 from cbpro.cbpro_auth import get_auth_headers
 
 
@@ -30,9 +30,9 @@ class WebsocketClient(object):
             api_secret="",
             api_passphrase="",
             # Make channels a required keyword-only argument; see pep3102
-            *,
+            #*,
             # Channel options: ['ticker', 'user', 'matches', 'level2', 'full']
-            channels):
+            channels=None):
         self.url = url
         self.products = products
         self.channels = channels
