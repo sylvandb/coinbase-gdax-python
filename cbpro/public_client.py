@@ -18,7 +18,7 @@ class PublicClient(object):
 
     """
 
-    def __init__(self, api_url='https://api.pro.coinbase.com', timeout=30):
+    def __init__(self, api_url='https://api.pro.coinbase.com', timeout=15):
         """Create cbpro API public client.
 
         Args:
@@ -28,6 +28,7 @@ class PublicClient(object):
         self.url = api_url.rstrip('/')
         self.auth = None
         self.session = requests.Session()
+        self.timeout = timeout
 
     def get_products(self):
         """Get a list of available currency pairs for trading.
@@ -266,7 +267,7 @@ class PublicClient(object):
         """
         url = self.url + endpoint
         r = self.session.request(method, url, params=params, data=data,
-                                 auth=self.auth, timeout=30)
+                                 auth=self.auth, timeout=self.timeout)
         return r.json()
 
     def _send_paginated_message(self, endpoint, params=None):
@@ -296,7 +297,7 @@ class PublicClient(object):
             params = dict()
         url = self.url + endpoint
         while True:
-            r = self.session.get(url, params=params, auth=self.auth, timeout=30)
+            r = self.session.get(url, params=params, auth=self.auth, timeout=self.timeout)
             results = r.json()
             for result in results:
                 yield result
