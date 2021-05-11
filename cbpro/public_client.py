@@ -115,7 +115,7 @@ class PublicClient(object):
         return self._send_message('get',
                                   '/products/{}/ticker'.format(product_id))
 
-    def get_product_trades(self, product_id, before='', after='', limit=None, result=None):
+    def get_product_trades(self, product_id, **kwargs):
         """List the latest trades for a product.
 
         This method returns a generator which may make multiple HTTP requests
@@ -123,13 +123,13 @@ class PublicClient(object):
 
         Args:
              product_id (str): Product
-             before (Optional[str]): start time in ISO 8601
-             after (Optional[str]): end time in ISO 8601
-             limit (Optional[int]): the desired number of trades (can be more than 100,
-                          automatically paginated)
-             results (Optional[list]): list of results that is used for the pagination
+             pagelimit / limit (Optional[int]): the desired number of trades per page
+                (pagelimit takes priority over limit)
+             before (Optional[str]): latest trade time in ISO 8601, default most recent trades
+             after (Optional[str]): earliest trade time in ISO 8601, default most recent trades
+
         Returns:
-             list: Latest trades. Example::
+             list generator of trades. Example:
                  [{
                      "time": "2014-11-07T22:19:28.578544Z",
                      "trade_id": 74,
@@ -145,7 +145,8 @@ class PublicClient(object):
          }]
         """
         return self._send_paginated_message('/products/{}/trades'
-                                            .format(product_id))
+                                            .format(product_id),
+                                            **kwargs)
 
     def get_product_historic_rates(self, product_id, start=None, end=None,
                                    granularity=None):
@@ -270,31 +271,38 @@ class PublicClient(object):
                                  auth=self.auth, timeout=self.timeout)
         return r.json()
 
-    def _send_paginated_message(self, endpoint, params=None):
+    def _send_paginated_message(self, endpoint, *, pagelimit=None, **kwargs):
         """ Send API message that results in a paginated response.
 
         The paginated responses are abstracted away by making API requests on
         demand as the response is iterated over.
 
-        Paginated API messages support 3 additional parameters: `before`,
-        `after`, and `limit`. `before` and `after` are mutually exclusive. To
+        Paginated API messages support 3 additional parameters: 'before',
+        'after', and 'limit'. 'before' and 'after' are mutually exclusive. To
         use them, supply an index value for that endpoint (the field used for
         indexing varies by endpoint - get_fills() uses 'trade_id', for example).
-            `before`: Only get data that occurs more recently than index
-            `after`: Only get data that occurs further in the past than index
-            `limit`: Set amount of data per HTTP response. Default (and
-                maximum) of 100.
+            'limit': Set amount of data per HTTP response (see pagelimit)
+            'before': Only get data that occurs more recently than index
+            'after': Only get data that occurs further in the past than index
 
         Args:
             endpoint (str): Endpoint (to be added to base URL)
-            params (Optional[dict]): HTTP request parameters
+            pagelimit (Optional[int]): overrides limit, with a better name
+            params (Deprecated[dict]): http parameters, use explicit pagelimit/limit/before/after
 
         Yields:
             dict: API response objects
 
         """
-        if params is None:
-            params = dict()
+        params = kwargs.get('params') or {}
+        for k in ('before', 'after', 'limit'):
+            try:
+                params[k] = kwargs[k]
+                del kwargs[k]
+            except KeyError:
+                pass
+        if pagelimit is not None:
+            params['limit'] = pagelimit
         url = self.url + endpoint
         while True:
             r = self.session.get(url, params=params, auth=self.auth, timeout=self.timeout)
