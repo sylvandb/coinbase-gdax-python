@@ -1,5 +1,8 @@
 #
-# cbpro/PublicClient.py
+# coinbase exchange public api
+# https://docs.cdp.coinbase.com/exchange/reference
+#
+# was cbpro/PublicClient.py
 # Daniel Paquin
 #
 # For public requests to the Coinbase exchange
@@ -8,21 +11,21 @@ import requests
 
 
 class PublicClient(object):
-    """cbpro public client API.
+    """coinbase exchange public client API.
 
     All requests default to the `product_id` specified at object
     creation if not otherwise specified.
 
     Attributes:
-        url (Optional[str]): API URL. Defaults to cbpro API.
+        url (Optional[str]): API URL. Defaults to coinbase exchange API.
 
     """
 
-    def __init__(self, api_url='https://api.pro.coinbase.com', timeout=15):
-        """Create cbpro API public client.
+    def __init__(self, api_url='https://api.exchange.coinbase.com', timeout=15):
+        """Create coinbase exchange API public client.
 
         Args:
-            api_url (Optional[str]): API URL. Defaults to cbpro API.
+            api_url (Optional[str]): API URL. Defaults to coinbase exchange API.
 
         """
         self.url = api_url.rstrip('/')
@@ -312,9 +315,34 @@ class PublicClient(object):
             # If there are no more pages, we're done. Otherwise update `after`
             # param to get next page.
             # If this request included `before` don't get any more pages - the
-            # cbpro API doesn't support multiple pages in that case.
+            # coinbase exchange API doesn't support multiple pages in that case.
             if not r.headers.get('cb-after') or \
                     params.get('before') is not None:
                 break
             else:
                 params['after'] = r.headers['cb-after']
+
+
+
+
+if __name__ == '__main__':
+
+    import json
+    import sys
+
+    pc = PublicClient()
+
+    #res = pc.get_products()
+    #res = pc.get_currencies()
+    #res = pc.get_time()
+    product_id = sys.argv[1].upper()
+    #res = pc.get_product_ticker(product_id)
+    #res = list(pc.get_product_trades(product_id))  # never ends?
+    #res = list(pc.get_product_trades(product_id, pagelimit=100))  # never ends?
+    #res = next(pc.get_product_trades(product_id))  # only gets one?
+    res = next(pc.get_product_trades(product_id, pagelimit=100))  # only gets one?
+    #res = pc.get_product_order_book(product_id)
+    #res = pc.get_product_historic_rates(product_id)
+    #res = pc.get_product_24hr_stats(product_id)
+
+    print(json.dumps(res, indent=2))
