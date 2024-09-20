@@ -126,8 +126,9 @@ class PublicClient(object):
 
         Args:
              product_id (str): Product
-             pagelimit / limit (Optional[int]): the desired number of trades per page
-                (pagelimit takes priority over limit)
+             limit (Optional[int]): overall limit of number of trades returned
+                (without this, the generator will continue as long as trades are available)
+             pagelimit (Optional[int]): the desired number of trades per page
              before (Optional[str]): latest trade time in ISO 8601, default most recent trades
              after (Optional[str]): earliest trade time in ISO 8601, default most recent trades
 
@@ -274,49 +275,57 @@ class PublicClient(object):
                                  auth=self.auth, timeout=self.timeout)
         return r.json()
 
-    def _send_paginated_message(self, endpoint, *, pagelimit=None, **kwargs):
+    def _send_paginated_message(self, endpoint, *, limit=None, pagelimit=None, before=None, after=None):
         """ Send API message that results in a paginated response.
 
         The paginated responses are abstracted away by making API requests on
         demand as the response is iterated over.
 
         Paginated API messages support 3 additional parameters: 'before',
-        'after', and 'limit'. 'before' and 'after' are mutually exclusive. To
+        'after', and '[page]limit'. 'before' and 'after' are mutually exclusive. To
         use them, supply an index value for that endpoint (the field used for
         indexing varies by endpoint - get_fills() uses 'trade_id', for example).
-            'limit': Set amount of data per HTTP response (see pagelimit)
+            '[page]limit': Set amount of data per HTTP response (see pagelimit arg)
             'before': Only get data that occurs more recently than index
             'after': Only get data that occurs further in the past than index
 
         Args:
             endpoint (str): Endpoint (to be added to base URL)
-            pagelimit (Optional[int]): overrides limit, with a better name
-            params (Deprecated[dict]): http parameters, use explicit pagelimit/limit/before/after
+            limit (Optional[int]): limit the overall number of records returned
+            pagelimit (Optional[int]): supply the limit parameter, with a better name
+            before (Optional[str]): supply the before parameter
+            after (Optional[str]): supply the after parameter
 
         Yields:
             dict: API response objects
 
         """
-        params = kwargs.get('params') or {}
-        for k in ('before', 'after', 'limit'):
-            try:
-                params[k] = kwargs[k]
-                del kwargs[k]
-            except KeyError:
-                pass
+        params = {}
+        if before is not None:
+            params['before'] = before
+        if after is not None:
+            params['after'] = after
         if pagelimit is not None:
             params['limit'] = pagelimit
+        # don't bother fetching more than requested
+        # 1000 was the coinbasepro default on 20210510
+        if limit and limit < params.get('limit', 1000):
+            params['limit'] = limit
+        rescount = 0
         url = self.url + endpoint
         while True:
             r = self.session.get(url, params=params, auth=self.auth, timeout=self.timeout)
             results = r.json()
+            rescount += len(results)
             for result in results:
                 yield result
+            #print('from %s, %d of %d' % (url, rescount, limit))
             # If there are no more pages, we're done. Otherwise update `after`
             # param to get next page.
             # If this request included `before` don't get any more pages - the
             # coinbase exchange API doesn't support multiple pages in that case.
             if not r.headers.get('cb-after') or \
+                    (limit and rescount >= limit) or \
                     params.get('before') is not None:
                 break
             else:
@@ -340,7 +349,9 @@ if __name__ == '__main__':
     #res = list(pc.get_product_trades(product_id))  # never ends?
     #res = list(pc.get_product_trades(product_id, pagelimit=100))  # never ends?
     #res = next(pc.get_product_trades(product_id))  # only gets one?
-    res = next(pc.get_product_trades(product_id, pagelimit=100))  # only gets one?
+    #res = next(pc.get_product_trades(product_id, pagelimit=100))  # only gets one?
+    #res = list(pc.get_product_trades(product_id, limit=1000))
+    res = list(pc.get_product_trades(product_id, limit=100))
     #res = pc.get_product_order_book(product_id)
     #res = pc.get_product_historic_rates(product_id)
     #res = pc.get_product_24hr_stats(product_id)
